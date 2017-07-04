@@ -1,0 +1,600 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="UTF-8">
+    <script src="https://code.jquery.com/jquery-1.12.4.min.js"></script>
+    <script>
+      function doFileLoad(){
+        //console.log(this);
+        var files = $('#fileupload')[0].files;
+        $.each(files, function(idx, file){
+          console.log(file);
+          if(file.name.indexOf('基础信息') == 0){
+            fillInBasic(file);
+          }else if(file.name.indexOf('家庭关系') == 0){
+            // fillInFamily(file);
+            fillInTheForm(file, 'tabs-0-1-205-dialog-form-TD_185336864', '姓名');
+          }else if(file.name.indexOf('执业资格') == 0){
+            // fillInWork(file);
+            fillInTheForm(file, 'tabs-0-1-205-dialog-form-TD_185566136', '执业资格名');
+          }else if(file.name.indexOf('教育经历') == 0){
+            //fillInEdu(file);
+            fillInTheForm(file, 'tabs-0-1-205-dialog-form-TD_339719124', '开始日期');
+          }else if(file.name.indexOf('职称资格') == 0){
+            // fillInPosition(file);
+            fillInTheForm(file, 'tabs-0-1-205-dialog-form-TD_185603689', '职称');
+          }else if(file.name.indexOf('非东银工作经历') == 0){
+            // fillInWorkExperience(file);
+            fillInTheForm(file, 'tabs-0-1-205-dialog-form-TD_346361190', '开始日期');
+          }
+        });
+
+        var newControl = $('#fileupload').clone();
+        var parent = $('#fileupload').parent();
+        $('#fileupload').remove();
+        parent.prepend(newControl);
+
+      }
+
+      function fillInBasic(file){
+        if(file){
+          var fr = new FileReader();
+          fr.onload = function(){
+            var map = parseCSV(this.result);
+
+            map.forEach(function(value, key){
+              console.log(key + '=' + value);
+              var label = $('form[action="executeCommonUserManageMethod.do?doMethod=save"]  label:contains("' + key +'")');
+              if(label.length > 0){
+                var input = label.siblings('input[name="' + label.attr('for') + '"]');
+                if(input.length > 0){//textbox or radio
+                  if(input.attr('type') == 'text'){//textbox
+                    input.val(value);
+                  }else if(input.attr('type') == 'radio'){
+                    $.each(input, function(idx, ele){
+                        if(ele.nextSibling.nodeValue.indexOf(value) >= 0){
+                          $(ele).prop( "checked", true );
+                        }
+                    });
+
+                  }
+                }else{//could be list box
+                  input = label.siblings('select[name="' + label.attr('for') + '"]');
+                  if(input.length > 0){
+                    var options = input.children('option');
+                    options.each(function(){
+                      console.log($(this).text());
+                      if(value == $(this).text()){
+                        input.val($(this).val());
+                      }
+                    });
+                  }
+                }
+
+
+              }
+            });
+
+          };
+          fr.readAsText(file, 'GBK');
+        //  fr.readAsDataURL(file, 'GBK');
+        }else{
+          alert('请选择正确的基础信息文件！')
+        }
+
+      }
+
+
+      function fillInTheForm(file, tabId, firstColumnName){
+        var fr = new FileReader();
+        fr.onload = function(){
+          var list = parseCSVforAll(this.result,firstColumnName);
+          if(list.length > 1){
+            var addButton = $('#' + tabId + ' input[type="button"]');       //tabs-0-1-205-dialog-form-TD_185336864 is the tab name of 家庭关系
+            //addButton.click(function(){console.log('Add is clicked')});
+            for(var i = 0; i < list.length - 1; i ++){
+              addButton.trigger('click');
+            }
+          }
+          var fieldsetList = $('#' + tabId + ' fieldset');
+          for(var i = 0; i < fieldsetList.length; i ++){
+            var fieldset = fieldsetList[i];
+            var map = list[i];
+            fillMapIntoFieldset(map, fieldset);
+          }
+
+
+        };
+
+        fr.readAsText(file, 'GBK');
+      }
+
+
+
+      function isEmpty(str){
+        return !str || str.trim().length == 0;
+      }
+
+
+      function fillMapIntoFieldset(map, fieldset){
+        map.forEach(function(value, key){
+        //  console.log(key + '=' + value);
+          var label = $(fieldset).find('label:contains("' + key +'")');
+          if(label.length > 0){
+            var input = label.siblings('input');
+            if(input.length > 0){//textbox
+              input.val(value);
+            }else{//could be list box
+              input = label.siblings('select');
+              if(input.length > 0){
+                var options = input.children('option');
+                options.each(function(){
+                //  console.log($(this).text());
+                  if(value == $(this).text()){
+                    input.val($(this).val());
+                  }
+                });
+              }
+            }
+
+
+          }
+        });
+
+      }
+
+      function parseCSV(csv){
+        var map = new Map();
+        var allRows = csv.split(/\r?\n|\r/);
+        $.each(allRows, function(index, row){
+          console.log(row);
+
+          var cells = row.split(',');
+          var key, value;
+          var isKeyReady = false;
+          var isValueReady = false;
+          var cell = null;
+          for(var i = 0; i < cells.length; i ++){
+              cell = cells[i];
+              if(isEmpty(cell)){//cell is empty
+                if(isKeyReady && !map.get(key)){
+                  map.set(key,'');
+                  isKeyReady = false;
+                }
+              }else{
+                if(isKeyReady && !map.get(key)){
+                  map.set(key, cell);
+                  isKeyReady = false;
+                }else{
+                  key = cell;
+                  isKeyReady = true;
+                }
+              }
+          }
+
+        });
+        return map;
+      }
+
+
+      function parseCSVforAll(csv, type){
+        var list = [];
+        var allRows = csv.split(/\r?\n|\r/);
+        $.each(allRows, function(index, row){
+          console.log(row);
+          if(row.indexOf(type) == 0){
+            var map = convertRowToMap(row, type);
+            if(map!=null){
+              list.push(map);
+            }
+          }
+
+        });
+
+        return list;
+
+      }
+
+      function convertRowToMap(row, type){
+        var map = new Map();
+        var cells = row.split(',');
+        var key, value;
+        var isKeyReady = false;
+        var isValueReady = false;
+        var cell = null;
+        for(var i = 0; i < cells.length; i ++){
+            cell = cells[i];
+            if(isEmpty(cell)){//cell is empty
+              if(isKeyReady && !map.get(key)){
+                map.set(key,'');
+                isKeyReady = false;
+              }
+            }else{
+              if(isKeyReady && !map.get(key)){
+                map.set(key, cell);
+                isKeyReady = false;
+              }else{
+                key = cell;
+                isKeyReady = true;
+              }
+            }
+        }
+
+        if(isEmpty(map.get(type))){
+          return null;
+        }
+
+        return map;
+      }
+
+      if(!window.Map){
+        window.Map = function(){
+          this.elements = new Array();
+          this.set = function(_key, _value) {
+            this.elements.push( {
+                key : _key,
+                value : _value
+            });
+          };
+
+          this.get = function(_key) {
+              try {
+                  for (i = 0; i < this.elements.length; i++) {
+                      if (this.elements[i].key == _key) {
+                          return this.elements[i].value;
+                      }
+                  }
+              } catch (e) {
+                  return null;
+              }
+          };
+
+          this.keys = function() {
+              var arr = new Array();
+              for (i = 0; i < this.elements.length; i++) {
+                  arr.push(this.elements[i].key);
+              }
+              return arr;
+          }
+
+
+          this.forEach = function(callback){
+            var len = this.elements.length;
+            if (typeof callback != "function") {
+                throw new TypeError();
+            }
+
+            for(var i = 0; i < len; i ++){
+              var item = this.elements[i];
+              callback.call(item, item.value, item.key);
+            }
+
+          }
+
+        }
+      }
+    </script>
+  </head>
+
+  <body>
+    <div>
+
+     <!-- <p>
+        <div><input id="fileupload" type="file" onchange="doFileLoad()" multiple="multiple"></div>
+      </p>
+
+
+      <form class="formee" action="executeCommonUserManageMethod.do?doMethod=save" method="post">
+      <div class="m_tab ui-tabs ui-widget ui-widget-content ui-corner-all" id="tabs-0-1-205-dialog-form-tabs">
+          <ul class="ui-tabs-nav ui-helper-reset ui-helper-clearfix ui-widget-header ui-corner-all">
+      		<li class="ui-state-default ui-corner-top"><a href="#tabs-0-1-205-dialog-form-tabs-1">基础信息</a></li>
+      		<li class="ui-state-default ui-corner-top"><a href="#tabs-0-1-205-dialog-form-tabs-2">东银体系内任职经历</a></li>
+      	<li class="ui-state-default ui-corner-top ui-tabs-selected ui-state-active"><a href="#tabs-0-1-205-dialog-form-TD_185336864">家庭关系</a></li><li class="ui-state-default ui-corner-top"><a href="#tabs-0-1-205-dialog-form-TD_185566136">执业资格</a></li><li class="ui-state-default ui-corner-top"><a href="#tabs-0-1-205-dialog-form-TD_339719124">教育经历</a></li><li class="ui-state-default ui-corner-top"><a href="#tabs-0-1-205-dialog-form-TD_185603689">职称资格</a></li><li class="ui-state-default ui-corner-top"><a href="#tabs-0-1-205-dialog-form-TD_346361190">非东银工作经历</a></li></ul>
+      	<div class="ui-tabs-panel ui-widget-content ui-corner-bottom ui-tabs-hide" id="tabs-0-1-205-dialog-form-tabs-1">
+      	    <fieldset>
+      	    <legend><strong>(1)</strong>
+      	    <a title="删除该条数据" class="fieldclose removeM hidden" role="button" href="#">
+      	    <span class="ui-icon ui-icon-closethick">close</span>
+      	    </a>
+      	    </legend>
+      		<input name="hid_u_position_id" class="bind" type="hidden" value="">
+      		<input name="hid_u_pl_id" class="bind" type="hidden" value="">
+      		<input name="photo" class="bind" type="hidden" value="">
+      		<input name="exitphoto" class="bind" type="hidden" value="">
+      		<div class="grid-1-3" style="height: 180px;">
+      			<label for="photoImg">员工照片<input title="上传照片" class="btn_up_photo" type="button" value="上传照片"></label>
+      			<div style="width: 80px; height: 180px; margin-top: 0px;">
+      				<img name="photoImg" width="130" height="150" style="padding-right: 20px; padding-left: 20px;" src="">
+      			</div>
+      		</div>
+      		<div class="grid-1-3">
+      			<label for="emp_no">员工编号(江动员工须录入该员工在金蝶EHR中的员工编号，其它公司员工在执行[保存]后由系统生成)<em class="form-req">*</em></label>
+      			<input name="emp_no" disabled="disabled" class="bind ui-widget-content ui-corner-all text" type="text">
+      		</div>
+      		<div class="grid-1-3">
+      			&nbsp;
+      		</div>
+      		<div class="grid-1-3 clear">
+      			<label for="name">员工姓名<em class="form-req">*</em></label>
+      			<input name="name" class="bind ui-widget-content ui-corner-all text" type="text">
+      		</div>
+      		<div class="grid-1-3">
+      			<label for="card_type">证件类型<em class="form-req">*</em></label>
+      			<select name="card_type" class="bind select ui-widget-content ui-corner-all"><option value="10301">身份证</option><option value="10302">护照</option><option value="10303">驾驶证</option><option value="10304">其它</option></select>
+      		</div>
+      		<div class="grid-1-3">
+      			<label for="id_card">证件号码<em class="form-req">*</em></label>
+      			<input name="id_card" class="bind unique ui-widget-content ui-corner-all text" type="text">
+      		</div>
+      		<div class="grid-1-3">
+      			<label for="usertype">员工类别<em class="form-req">*</em></label>
+
+
+      			<select name="usertype" class="bind select ui-widget-content ui-corner-all"><option value="10401">试用期员工</option><option value="10402">正式员工</option><option value="10403">实习员工</option><option value="10404">临时工</option><option value="10405">劳务派遣工</option><option value="10406">退休返聘员工</option><option value="10407">编外员工</option><option value="10408">管培生-暂未占编</option><option value="10409">待岗发薪</option></select>
+      		</div>
+
+
+      		<div class="grid-1-3">
+      			<label for="postion_id_name">职位(由实际晋升或异动的变动须到人事事务中调整)<em class="form-req">*</em></label>
+      	       <input name="postion_id_name" disabled="disabled" class="ui-widget-content ui-corner-all text" style="width: 75%;" type="text" value="">
+      	       <input name="postion_id" class="bind" type="hidden" value="">
+      	       <input title="选择职位" class="postion_id_tree" type="button" value="选择">
+      		</div>
+      		<div class="grid-1-3" style="display: none;">
+      	       <label for="post_grade">职等</label>
+      		   <select name="post_grade" class="bind select ui-widget-content ui-corner-all"></select>
+      		</div>
+      		<div class="grid-1-3">
+
+      	       <label for="post_lev">职级(由实际晋升或异动的变动须到人事事务中调整)</label>
+      	       <select name="post_lev" class="bind select ui-widget-content ui-corner-all"></select>
+      		</div>
+      		<div class="grid-1-3">
+      			<label for="entry_time">入职时间<em class="form-req">yyyy-MM-dd*</em></label>
+      			<input name="entry_time" class="bind datepicker hasDatepicker ui-widget-content ui-corner-all text" id="dp1498899909589" type="text">
+      		</div>
+      	   <div class="grid-1-3">
+      			<label for="positive_time">拟转正时间<em class="form-req">yyyy-MM-dd*</em></label>
+      			<input name="positive_time" class="bind datepicker hasDatepicker ui-widget-content ui-corner-all text" id="dp1498899909590" type="text">
+      		</div>
+
+
+      		<div class="grid-1-3">
+      			<label for="u_name">用户名<em class="form-req">*</em></label>
+      			<input name="u_name" class="bind unique ui-widget-content ui-corner-all text" style="width: 40%;" type="text">
+      			<input title="用户名规则:员工姓名全拼(不能捕捉多音字,此情况下须手动修改,另:重名情况下系统自动加后缀);密码规则：证件号后6位(证件号小于6位时,为证件号全值)" class="createUNamePwd" type="button" value="生成用户名及密码">
+      		</div>
+      		<div class="grid-1-3">
+      			<label for="u_state">状态<em class="form-req">*</em></label>
+      			<select name="u_state" class="bind select ui-widget-content ui-corner-all"><option value="10501">在职</option><option value="10502">离职</option></select>
+      		</div>
+      		<div class="grid-1-3">
+      			<label>地产职能<em class="form-req">*</em></label>
+      	       <input name="position_type_name" disabled="disabled" class="ui-widget-content ui-corner-all text" style="width: 75%;" type="text" value="">
+      	       <input name="position_type" class="bind" type="hidden" value="">
+      	       <input title="选择人员岗位分类" class="postion_type_tree" type="button" value="选择">
+      		</div>
+      		<div class="grid-1-3">
+      			<label for="birthday">生日<em class="form-req">yyyy-MM-dd*</em></label>
+      			<input name="birthday" class="bind datepicker hasDatepicker ui-widget-content ui-corner-all text" id="dp1498899909591" type="text">
+      		</div>
+      		<div class="grid-1-3">
+      			<label for="nation">民族<em class="form-req">*</em></label>
+
+      			<select name="nation" class="bind select ui-widget-content ui-corner-all"><option value="17301">汉族</option><option value="17302">蒙古族</option><option value="17303">回族</option><option value="17304">藏族</option><option value="17305">维吾尔族</option><option value="17306">苗族</option><option value="17307">彝族</option><option value="17308">壮族</option><option value="17309">布依族</option><option value="17310">朝鲜族</option><option value="17311">满族</option><option value="17312">侗族</option><option value="17313">瑶族</option><option value="17314">白族</option><option value="17315">土家族</option><option value="17316">哈尼族</option><option value="17317">哈萨克族</option><option value="17318">傣族</option><option value="17319">黎族</option><option value="17320">僳僳族</option><option value="17321">佤族</option><option value="17322">畲族</option><option value="17323">高山族</option><option value="17324">拉祜族</option><option value="17325">水族</option><option value="17326">东乡族</option><option value="17327">纳西族</option><option value="17328">景颇族</option><option value="17329">柯尔克孜族</option><option value="17330">土族</option><option value="17331">达斡尔族</option><option value="17332">仫佬族</option><option value="17333">羌族</option><option value="17334">布朗族</option><option value="17335">撒拉族</option><option value="17336">毛南族</option><option value="17337">仡佬族</option><option value="17338">锡伯族</option><option value="17339">阿昌族</option><option value="17340">普米族</option><option value="17341">塔吉克族</option><option value="17342">怒族</option><option value="17343">乌孜别克族</option><option value="17344">俄罗斯族</option><option value="17345">鄂温克族</option><option value="17346">德昂族</option><option value="17347">保安族</option><option value="17348">裕固族</option><option value="17349">京族</option><option value="17350">塔塔尔族</option><option value="17351">独龙族</option><option value="17352">鄂伦春族</option><option value="17353">赫哲族</option><option value="17354">门巴族</option><option value="17355">珞巴族</option><option value="17356">基诺族</option></select>
+      		</div>
+      		<div class="grid-1-3">
+      			<label for="sex">性别<em class="form-req">*</em></label>
+      			<input name="sex" class="bind" type="radio" checked="checked" value="1">男
+      			<input name="sex" class="bind" type="radio" value="0">女
+      		</div>
+      		<div class="grid-1-3">
+      			<label for="hf">婚姻状况<em class="form-req">*</em></label>
+
+
+      			<select name="hf" class="bind select ui-widget-content ui-corner-all"><option value="18201">未婚</option><option value="18202">已婚</option><option value="18203">离异</option></select>
+      		</div>
+      		<div class="grid-1-3">
+      			<label for="jg">籍贯<em class="form-req">*</em></label>
+      			<input name="jg" class="bind ui-widget-content ui-corner-all text" type="text">
+      		</div>
+      		<div class="grid-1-3">
+      			<label for="zgxl">最高学历<em class="form-req">*</em></label>
+
+      			<select name="zgxl" class="bind select ui-widget-content ui-corner-all"><option value="13001">初中及其以下</option><option value="13002">高中</option><option value="13007">中专</option><option value="13003">大学专科</option><option value="13004">大学本科</option><option value="13005">硕士</option><option value="13006">博士及以上</option></select>
+      		</div>
+      		<div class="grid-1-3">
+      			<label for="hk_type">户口性质<em class="form-req">*</em></label>
+      			<select name="hk_type" class="bind select ui-widget-content ui-corner-all"><option value="17701">城镇</option><option value="17702">农业</option></select>
+      		</div>
+      		<div class="grid-1-3">
+      			<label for="hkdz">户口地址<em class="form-req">*</em></label>
+      			<input name="hkdz" class="bind ui-widget-content ui-corner-all text" type="text">
+      		</div>
+      		<div class="grid-1-3">
+      			<label for="mobile">移动电话<em class="form-req">*</em></label>
+      			<input name="mobile" class="bind ui-widget-content ui-corner-all text" type="text">
+      		</div>
+      		<div class="grid-1-3">
+      			<label for="jjlxr">紧急联系人<em class="form-req">*</em></label>
+      			<input name="jjlxr" class="bind ui-widget-content ui-corner-all text" type="text">
+      		</div>
+      		<div class="grid-1-3">
+      			<label for="jjlxdh">紧急联系电话<em class="form-req">*</em></label>
+      			<input name="jjlxdh" class="bind ui-widget-content ui-corner-all text" type="text">
+      		</div>
+
+      		<div class="grid-1-3">
+      			<label for="psw">密码(密码安全值须大于等于70)<em class="form-req">*</em></label>
+      			<input name="psw" class="bind ui-widget-content ui-corner-all text" type="text" maxlength="20">
+      			<div id="passwordStrengthDiv"></div>
+      		</div>
+
+      		<div class="grid-1-3">
+      			<label for="u_lev">人员层级<em class="form-req">*</em></label>
+      			<select name="u_lev" class="bind select ui-widget-content ui-corner-all"><option value="17801">普通人员</option><option value="17802">中层人员</option><option value="17803">高层人员</option></select>
+      		</div>
+
+
+
+
+      		<div class="grid-1-3">
+      			<label for="country">国籍<em class="form-req">*</em></label>
+      			<select name="country" class="bind select ui-widget-content ui-corner-all"><option value="176001">中国</option><option value="176002">美国</option><option value="176003">法国</option><option value="176004">英国</option><option value="176005">日本</option><option value="176006">德国</option><option value="176007">香港</option><option value="176008">俄罗斯</option><option value="176009">新加坡</option><option value="176010">阿富汗</option><option value="176011">阿联酋</option><option value="176012">阿根廷</option><option value="176013">澳大利亚</option><option value="176014">韩国</option><option value="176015">台湾</option></select>
+      		</div>
+
+
+      		<div class="grid-1-3" style="display: none;">
+      			<label for="sg">身高(cm)<em class="form-req">*</em></label>
+      			<input name="sg" class="bind ui-widget-content ui-corner-all text" type="text" value="0">
+      		</div>
+      		<div class="grid-1-3" style="display: none;">
+      			<label for="tz">体重(kg)<em class="form-req">*</em></label>
+      			<input name="tz" class="bind ui-widget-content ui-corner-all text" type="text" value="0">
+      		</div>
+
+
+      		<div class="grid-1-3">
+      			<label for="zzmm">政治面貌<em class="form-req">*</em></label>
+
+      			<select name="zzmm" class="bind select ui-widget-content ui-corner-all"><option value="17201">中共党员</option><option value="17202">共青团员</option><option value="17203">群众</option><option value="17204">无党派民主人士</option><option value="17205">中国共产党预备党员</option><option value="17206">中国民主促进会会员</option></select>
+      		</div>
+      		<div class="grid-1-3">
+      			<label for="sl">本司工作年限(年)</label>
+      			<input name="sl" disabled="disabled" class="bind ui-widget-content ui-corner-all text" type="text" value="0">
+      		</div>
+      		<div class="grid-1-3">
+      			<label for="working_age">集团内工作年限(年)</label>
+      			<input name="working_age" disabled="disabled" class="bind ui-widget-content ui-corner-all text" type="text" value="0">
+      			<input name="working_age_start_time" class="bind" type="hidden" value="">
+      		</div>
+
+
+      		<div class="grid-1-3" style="display: none;">
+      			<label for="card_start_date">证件有效期(长期只针对时间止字段)<em class="form-req">yyyy-MM-dd*</em></label>
+      			<input name="card_start_date" class="bind datepicker hasDatepicker ui-widget-content ui-corner-all text" id="dp1498899909592" style="width: 33%;" type="text" value="1900-01-01">至
+      			<input name="card_exp_date" class="bind datepicker hasDatepicker ui-widget-content ui-corner-all text" id="dp1498899909593" style="width: 33%;" type="text" value="1900-01-01">
+      			<input name="chkExpDate" type="checkbox">长期
+      		</div>
+
+
+
+      		<div class="grid-1-3">
+      			<label for="email">公司邮箱(无需手动录入,在用户账号中心进行开通)</label>
+      			<input name="email" disabled="disabled" class="bind ui-widget-content ui-corner-all text" type="text">
+
+      			<input name="263org_id" type="hidden" value="">
+      			<input name="263org_name" type="hidden" value="">
+      		</div>
+
+      		<div class="grid-1-3">
+      			<label for="phone">电话</label>
+      			<input name="phone" class="bind ui-widget-content ui-corner-all text" type="text">
+      		</div>
+
+
+
+
+
+      		<div class="grid-1-3">
+      			<label for="postcode">邮编</label>
+      			<input name="postcode" class="bind ui-widget-content ui-corner-all text" type="text">
+      		</div>
+      		<div class="grid-1-3">
+      			<label for="address">联系地址</label>
+      			<input name="address" class="bind ui-widget-content ui-corner-all text" type="text">
+      		</div>
+      		<div class="grid-1-3">
+      			<label for="zc">职称</label>
+      			<input name="zc" class="bind ui-widget-content ui-corner-all text" type="text">
+      		</div>
+      		<div class="grid-1-3">
+      			<label for="bank">开户行</label>
+
+      			<select name="bank" class="bind select ui-widget-content ui-corner-all"><option value="18800">--请选择--</option><option value="18801">中国银行</option><option value="18802">中国工商银行</option><option value="18803">中国建设银行</option><option value="18804">中国农业银行</option><option value="18805">交通银行</option><option value="18806">中信银行</option><option value="18807">中国光大银行</option><option value="18808">华夏银行</option><option value="18809">中国民生银行</option><option value="18810">招商银行</option><option value="18811">兴业银行</option><option value="18812">中国邮政储蓄银行</option></select>
+      		</div>
+      		<div class="grid-1-3">
+      			<label for="bank_branch">开户网点</label>
+      			<input name="bank_branch" class="bind ui-widget-content ui-corner-all text" type="text">
+      		</div>
+      		<div class="grid-1-3">
+      			<label for="bank_account">银行卡号</label>
+      			<input name="bank_account" class="bind ui-widget-content ui-corner-all text" type="text">
+      		</div>
+      		<div class="grid-1-3">
+      			<label for="driving_type">驾照类型</label>
+      			<select name="driving_type" class="bind select ui-widget-content ui-corner-all"><option value="17501">无</option><option value="17502">A1</option><option value="17503">A2</option><option value="17504">A3</option><option value="17505">B1</option><option value="17506">B2</option><option value="17507">C1</option><option value="17508">C2</option><option value="17509">C3</option><option value="17510">C4</option><option value="17511">D</option><option value="17512">E</option><option value="17513">F</option></select>
+      		</div>
+      	    <div class="grid-1-3">
+      			<label for="u_enable">是否启用<em class="form-req">*</em></label>
+      			<input name="u_enable" class="bind" type="radio" checked="checked" value="1">启用
+      			<input name="u_enable" class="bind" type="radio" value="0">禁用
+      		</div>
+      		<div class="grid-1-3">
+      			<label for="hide">是否隐藏<em class="form-req">*</em></label>
+      			<input name="hide" class="bind" type="radio" checked="checked" value="0">不隐藏
+      			<input name="hide" class="bind" type="radio" value="1">隐藏
+      		</div>
+
+
+      		<div class="grid-12-12 clear">
+      			<label for="des">备注描述</label> <textarea name="des" class="bind ui-widget-content ui-corner-all" style="overflow: auto;"></textarea>
+      		</div>
+      			<input name="OID" class="bind" type="hidden" value="">
+      			<input name="dcCompanyName" type="hidden" value="地产集团">
+      		    <input name="ParentID" type="hidden" value="1">
+
+      		    <input name="onboradFlag" class="bind" type="hidden" value="1">
+      		    <input name="dept_id_name" class="bind" type="hidden" value="东银控股(8985/12)-地产集团(2535/5)-重庆东原(285/1)-公司负责人(1)">
+      		    <input name="dept_id" class="bind" type="hidden" value="1546">
+      		    <input name="exists_sd_id" class="bind" type="hidden" value="">
+             		<input name="new_sd_id" class="bind" type="hidden" value="">
+             		<input name="del_sd_id" class="bind" type="hidden" value="">
+      	  </fieldset>
+
+
+      	</div>
+      	<div class="ui-tabs-panel ui-widget-content ui-corner-bottom ui-tabs-hide" id="tabs-0-1-205-dialog-form-tabs-2">
+      		该员工无东银体系内任职经历
+      	</div>
+
+      <div class="ui-tabs-panel ui-widget-content ui-corner-bottom" id="tabs-0-1-205-dialog-form-TD_185336864"><fieldset><legend><strong>(1)</strong><a title="删除该条数据" class="fieldclose removeM hidden" role="button" href="#"><span class="ui-icon ui-icon-closethick">close</span></a></legend><input name="TD_185336864SEQ#1" class="bind" type="hidden"><input name="C_185346137#1" class="bind" type="hidden"><div class="grid-1-3"><label for="C_185373618#1">姓名</label><input name="C_185373618#1" class="bind ui-widget-content ui-corner-all text" type="text"></div><div class="grid-1-3"><label for="C_185439601#1">与本人关系</label><select name="C_185439601#1" class="bind select ui-widget-content ui-corner-all"><option value="18101">父亲</option><option value="18102">母亲</option><option value="18103">公公</option><option value="18104">婆婆</option><option value="18105">岳父</option><option value="18106">岳母</option><option value="18107">配偶</option><option value="18108">子</option><option value="18109">长子</option><option value="18110">次子</option><option value="18111">三子</option><option value="18112">女婿</option><option value="18113">女</option><option value="18114">长女</option><option value="18115">二女</option><option value="18116">三女</option><option value="18117">儿媳</option><option value="18118">兄</option><option value="18119">嫂</option><option value="18120">弟</option><option value="18121">弟媳</option><option value="18122">姐姐</option><option value="18123">姐夫</option><option value="18124">妹妹</option><option value="18125">妹夫</option><option value="18126">独生子</option><option value="18127">夫</option><option value="18128">姑父</option><option value="18129">姑母</option><option value="18130">舅父</option><option value="18131">妻</option><option value="18132">其他亲属</option><option value="18133">叔父</option><option value="18134">兄弟姐妹</option><option value="18135">姨父</option><option value="18136">侄子</option></select></div><div class="grid-1-3"><label for="C_100234196#1">出生日期</label><input name="C_100234196#1" class="bind datepicker ui-widget-content ui-corner-all text hasDatepicker" id="dp1498899909608" type="text"></div><div class="grid-1-3"><label for="C_185458539#1">联系电话</label><input name="C_185458539#1" class="bind ui-widget-content ui-corner-all text" type="text"></div><div class="grid-1-3"><label for="C_185460178#1">工作单位/地址</label><input name="C_185460178#1" class="bind ui-widget-content ui-corner-all text" type="text"></div><div class="grid-1-3"><label for="C_185336869#1">创建时间</label><input name="C_185336869#1" class="bind datepicker ui-widget-content ui-corner-all text hasDatepicker" id="dp1498899909609" type="text"></div><div class="grid-1-3"><label for="C_185336868#1">排序</label><input name="C_185336868#1" class="bind ui-widget-content ui-corner-all text" type="text"></div><div class="grid-1-3"><label for="C_185336867#1">是否隐藏</label><input name="C_185336867#1" class="bind" type="radio" value="1">不隐藏<input name="C_185336867#1" class="bind" type="radio" value="0">隐藏</div><div class="grid-1-3"><label for="C_185336866#1">是否可用</label><input name="C_185336866#1" class="bind" type="radio" value="1">启用<input name="C_185336866#1" class="bind" type="radio" value="0">禁用</div><div class="grid-12-12  clear"><label for="C_185336865#1">备注</label><textarea name="C_185336865#1" class="bind ui-widget-content ui-corner-all" style="overflow: auto;"></textarea></div> </fieldset><input name="TD_185336864_EXISTS_RCDNO" class="bind" type="hidden" value="0"><fieldset><legend><strong>(2)</strong><a title="删除该条数据" class="fieldclose removeM hidden" role="button" style="display: inline;" href="#"><span class="ui-icon ui-icon-closethick">close</span></a></legend><input name="TD_185336864SEQ#1$2" class="bind" type="hidden"><input name="C_185346137#1$2" class="bind" type="hidden"><div class="grid-1-3"><label for="C_185373618#1">姓名</label><input name="C_185373618#1$2" class="bind ui-widget-content ui-corner-all text" type="text"></div><div class="grid-1-3"><label for="C_185439601#1">与本人关系</label><select name="C_185439601#1$2" class="bind select ui-widget-content ui-corner-all"><option value="18101">父亲</option><option value="18102">母亲</option><option value="18103">公公</option><option value="18104">婆婆</option><option value="18105">岳父</option><option value="18106">岳母</option><option value="18107">配偶</option><option value="18108">子</option><option value="18109">长子</option><option value="18110">次子</option><option value="18111">三子</option><option value="18112">女婿</option><option value="18113">女</option><option value="18114">长女</option><option value="18115">二女</option><option value="18116">三女</option><option value="18117">儿媳</option><option value="18118">兄</option><option value="18119">嫂</option><option value="18120">弟</option><option value="18121">弟媳</option><option value="18122">姐姐</option><option value="18123">姐夫</option><option value="18124">妹妹</option><option value="18125">妹夫</option><option value="18126">独生子</option><option value="18127">夫</option><option value="18128">姑父</option><option value="18129">姑母</option><option value="18130">舅父</option><option value="18131">妻</option><option value="18132">其他亲属</option><option value="18133">叔父</option><option value="18134">兄弟姐妹</option><option value="18135">姨父</option><option value="18136">侄子</option></select></div><div class="grid-1-3"><label for="C_100234196#1">出生日期</label><input name="C_100234196#1$2" class="bind datepicker ui-widget-content ui-corner-all text hasDatepicker" id="dp1498899909620" type="text"></div><div class="grid-1-3"><label for="C_185458539#1">联系电话</label><input name="C_185458539#1$2" class="bind ui-widget-content ui-corner-all text" type="text"></div><div class="grid-1-3"><label for="C_185460178#1">工作单位/地址</label><input name="C_185460178#1$2" class="bind ui-widget-content ui-corner-all text" type="text"></div><div class="grid-1-3"><label for="C_185336869#1">创建时间</label><input name="C_185336869#1$2" class="bind datepicker ui-widget-content ui-corner-all text hasDatepicker" id="dp1498899909621" type="text"></div><div class="grid-1-3"><label for="C_185336868#1">排序</label><input name="C_185336868#1$2" class="bind ui-widget-content ui-corner-all text" type="text"></div><div class="grid-1-3"><label for="C_185336867#1">是否隐藏</label><input name="C_185336867#1$2" class="bind" type="radio" value="1">不隐藏<input name="C_185336867#1$2" class="bind" type="radio" value="0">隐藏</div><div class="grid-1-3"><label for="C_185336866#1">是否可用</label><input name="C_185336866#1$2" class="bind" type="radio" value="1">启用<input name="C_185336866#1$2" class="bind" type="radio" value="0">禁用</div><div class="grid-12-12  clear"><label for="C_185336865#1">备注</label><textarea name="C_185336865#1$2" class="bind ui-widget-content ui-corner-all" style="overflow: auto;"></textarea></div> </fieldset><fieldset><legend><strong>(3)</strong><a title="删除该条数据" class="fieldclose removeM hidden" role="button" style="display: inline;" href="#"><span class="ui-icon ui-icon-closethick">close</span></a></legend><input name="TD_185336864SEQ#1$3" class="bind" type="hidden"><input name="C_185346137#1$3" class="bind" type="hidden"><div class="grid-1-3"><label for="C_185373618#1">姓名</label><input name="C_185373618#1$3" class="bind ui-widget-content ui-corner-all text" type="text"></div><div class="grid-1-3"><label for="C_185439601#1">与本人关系</label><select name="C_185439601#1$3" class="bind select ui-widget-content ui-corner-all"><option value="18101">父亲</option><option value="18102">母亲</option><option value="18103">公公</option><option value="18104">婆婆</option><option value="18105">岳父</option><option value="18106">岳母</option><option value="18107">配偶</option><option value="18108">子</option><option value="18109">长子</option><option value="18110">次子</option><option value="18111">三子</option><option value="18112">女婿</option><option value="18113">女</option><option value="18114">长女</option><option value="18115">二女</option><option value="18116">三女</option><option value="18117">儿媳</option><option value="18118">兄</option><option value="18119">嫂</option><option value="18120">弟</option><option value="18121">弟媳</option><option value="18122">姐姐</option><option value="18123">姐夫</option><option value="18124">妹妹</option><option value="18125">妹夫</option><option value="18126">独生子</option><option value="18127">夫</option><option value="18128">姑父</option><option value="18129">姑母</option><option value="18130">舅父</option><option value="18131">妻</option><option value="18132">其他亲属</option><option value="18133">叔父</option><option value="18134">兄弟姐妹</option><option value="18135">姨父</option><option value="18136">侄子</option></select></div><div class="grid-1-3"><label for="C_100234196#1">出生日期</label><input name="C_100234196#1$3" class="bind datepicker ui-widget-content ui-corner-all text hasDatepicker" id="dp1498899909622" type="text"></div><div class="grid-1-3"><label for="C_185458539#1">联系电话</label><input name="C_185458539#1$3" class="bind ui-widget-content ui-corner-all text" type="text"></div><div class="grid-1-3"><label for="C_185460178#1">工作单位/地址</label><input name="C_185460178#1$3" class="bind ui-widget-content ui-corner-all text" type="text"></div><div class="grid-1-3"><label for="C_185336869#1">创建时间</label><input name="C_185336869#1$3" class="bind datepicker ui-widget-content ui-corner-all text hasDatepicker" id="dp1498899909623" type="text"></div><div class="grid-1-3"><label for="C_185336868#1">排序</label><input name="C_185336868#1$3" class="bind ui-widget-content ui-corner-all text" type="text"></div><div class="grid-1-3"><label for="C_185336867#1">是否隐藏</label><input name="C_185336867#1$3" class="bind" type="radio" value="1">不隐藏<input name="C_185336867#1$3" class="bind" type="radio" value="0">隐藏</div><div class="grid-1-3"><label for="C_185336866#1">是否可用</label><input name="C_185336866#1$3" class="bind" type="radio" value="1">启用<input name="C_185336866#1$3" class="bind" type="radio" value="0">禁用</div><div class="grid-12-12  clear"><label for="C_185336865#1">备注</label><textarea name="C_185336865#1$3" class="bind ui-widget-content ui-corner-all" style="overflow: auto;"></textarea></div> </fieldset><input title="添加多条数据" class="form-button addM" type="button" value="添加"></div>
+
+      <div class="ui-tabs-panel ui-widget-content ui-corner-bottom ui-tabs-hide" id="tabs-0-1-205-dialog-form-TD_185566136"><fieldset><legend><strong>(1)</strong><a title="删除该条数据" class="fieldclose removeM hidden" role="button" href="#"><span class="ui-icon ui-icon-closethick">close</span></a></legend><input name="TD_185566136SEQ#1" class="bind" type="hidden"><input name="C_185581428#1" class="bind" type="hidden"><div class="grid-1-3"><label for="C_185586692#1">执业资格名</label><input name="C_185586692#1" class="bind ui-widget-content ui-corner-all text" type="text"></div><div class="grid-1-3"><label for="C_185588403#1">取得时间</label><input name="C_185588403#1" class="bind datepicker ui-widget-content ui-corner-all text hasDatepicker" id="dp1498899909610" type="text"></div><div class="grid-1-3"><label for="C_185589982#1">证书号</label><input name="C_185589982#1" class="bind ui-widget-content ui-corner-all text" type="text"></div><div class="grid-1-3"><label for="C_185591368#1">颁发单位</label><input name="C_185591368#1" class="bind ui-widget-content ui-corner-all text" type="text"></div><div class="grid-1-3"><label for="C_185566141#1">创建时间</label><input name="C_185566141#1" class="bind datepicker ui-widget-content ui-corner-all text hasDatepicker" id="dp1498899909611" type="text"></div><div class="grid-1-3"><label for="C_185566140#1">排序</label><input name="C_185566140#1" class="bind ui-widget-content ui-corner-all text" type="text"></div><div class="grid-1-3"><label for="C_185566139#1">是否隐藏</label><input name="C_185566139#1" class="bind" type="radio" value="1">不隐藏<input name="C_185566139#1" class="bind" type="radio" value="0">隐藏</div><div class="grid-1-3"><label for="C_185566138#1">是否可用</label><input name="C_185566138#1" class="bind" type="radio" value="1">启用<input name="C_185566138#1" class="bind" type="radio" value="0">禁用</div><div class="grid-12-12  clear"><label for="C_185566137#1">备注</label><textarea name="C_185566137#1" class="bind ui-widget-content ui-corner-all" style="overflow: auto;"></textarea></div> </fieldset><input name="TD_185566136_EXISTS_RCDNO" class="bind" type="hidden" value="0"><input title="添加多条数据" class="form-button addM" type="button" value="添加"></div><div class="ui-tabs-panel ui-widget-content ui-corner-bottom ui-tabs-hide" id="tabs-0-1-205-dialog-form-TD_339719124"><fieldset><legend><strong>(1)</strong><a title="删除该条数据" class="fieldclose removeM hidden" role="button" href="#"><span class="ui-icon ui-icon-closethick">close</span></a></legend><input name="TD_339719124SEQ#1" class="bind" type="hidden"><input name="C_339747460#1" class="bind" type="hidden"><div class="grid-1-3"><label for="C_339748841#1">开始日期</label><input name="C_339748841#1" class="bind datepicker ui-widget-content ui-corner-all text hasDatepicker" id="dp1498899909612" type="text"></div><div class="grid-1-3"><label for="C_339749738#1">结束日期</label><input name="C_339749738#1" class="bind datepicker ui-widget-content ui-corner-all text hasDatepicker" id="dp1498899909613" type="text"></div><div class="grid-1-3"><label for="C_339752084#1">院校名称</label><input name="C_339752084#1" class="bind ui-widget-content ui-corner-all text" type="text"></div><div class="grid-1-3"><label for="C_339755413#1">主修专业</label><input name="C_339755413#1" class="bind ui-widget-content ui-corner-all text" type="text"></div><div class="grid-1-3"><label for="C_339756789#1">学历</label><select name="C_339756789#1" class="bind select ui-widget-content ui-corner-all"><option value="13001">初中及其以下</option><option value="13002">高中</option><option value="13007">中专</option><option value="13003">大学专科</option><option value="13004">大学本科</option><option value="13005">硕士</option><option value="13006">博士及以上</option></select></div><div class="grid-1-3"><label for="C_185511164#1">毕业证书编号</label><input name="C_185511164#1" class="bind ui-widget-content ui-corner-all text" type="text"></div><div class="grid-1-3"><label for="C_339757763#1">学位</label><select name="C_339757763#1" class="bind select ui-widget-content ui-corner-all"><option value="17401">无</option><option value="17402">学士</option><option value="17403">硕士</option><option value="17404">博士</option></select></div><div class="grid-1-3"><label for="C_185517039#1">学位证书编号</label><input name="C_185517039#1" class="bind ui-widget-content ui-corner-all text" type="text"></div><div class="grid-1-3"><label for="C_339719129#1">创建时间</label><input name="C_339719129#1" class="bind datepicker ui-widget-content ui-corner-all text hasDatepicker" id="dp1498899909614" type="text"></div><div class="grid-1-3"><label for="C_339719128#1">排序</label><input name="C_339719128#1" class="bind ui-widget-content ui-corner-all text" type="text"></div><div class="grid-1-3"><label for="C_339719127#1">是否隐藏</label><input name="C_339719127#1" class="bind" type="radio" value="1">不隐藏<input name="C_339719127#1" class="bind" type="radio" value="0">隐藏</div><div class="grid-1-3"><label for="C_339719126#1">是否可用</label><input name="C_339719126#1" class="bind" type="radio" value="1">启用<input name="C_339719126#1" class="bind" type="radio" value="0">禁用</div><div class="grid-12-12  clear"><label for="C_339719125#1">备注</label><textarea name="C_339719125#1" class="bind ui-widget-content ui-corner-all" style="overflow: auto;"></textarea></div> </fieldset><input name="TD_339719124_EXISTS_RCDNO" class="bind" type="hidden" value="0"><input title="添加多条数据" class="form-button addM" type="button" value="添加"></div><div class="ui-tabs-panel ui-widget-content ui-corner-bottom ui-tabs-hide" id="tabs-0-1-205-dialog-form-TD_185603689"><fieldset><legend><strong>(1)</strong><a title="删除该条数据" class="fieldclose removeM hidden" role="button" href="#"><span class="ui-icon ui-icon-closethick">close</span></a></legend><input name="TD_185603689SEQ#1" class="bind" type="hidden"><input name="C_185611600#1" class="bind" type="hidden"><div class="grid-1-3"><label for="C_185613675#1">职称</label><input name="C_185613675#1" class="bind ui-widget-content ui-corner-all text" type="text"></div><div class="grid-1-3"><label for="C_185616639#1">专业名称</label><input name="C_185616639#1" class="bind ui-widget-content ui-corner-all text" type="text"></div><div class="grid-1-3"><label for="C_185626257#1">资格级别</label><input name="C_185626257#1" class="bind ui-widget-content ui-corner-all text" type="text"></div><div class="grid-1-3"><label for="C_185627798#1">取得时间</label><input name="C_185627798#1" class="bind datepicker ui-widget-content ui-corner-all text hasDatepicker" id="dp1498899909615" type="text"></div><div class="grid-1-3"><label for="C_185629011#1">证书号</label><input name="C_185629011#1" class="bind ui-widget-content ui-corner-all text" type="text"></div><div class="grid-1-3"><label for="C_185630350#1">颁发单位</label><input name="C_185630350#1" class="bind ui-widget-content ui-corner-all text" type="text"></div><div class="grid-1-3"><label for="C_185603694#1">创建时间</label><input name="C_185603694#1" class="bind datepicker ui-widget-content ui-corner-all text hasDatepicker" id="dp1498899909616" type="text"></div><div class="grid-1-3"><label for="C_185603693#1">排序</label><input name="C_185603693#1" class="bind ui-widget-content ui-corner-all text" type="text"></div><div class="grid-1-3"><label for="C_185603692#1">是否隐藏</label><input name="C_185603692#1" class="bind" type="radio" value="1">不隐藏<input name="C_185603692#1" class="bind" type="radio" value="0">隐藏</div><div class="grid-1-3"><label for="C_185603691#1">是否可用</label><input name="C_185603691#1" class="bind" type="radio" value="1">启用<input name="C_185603691#1" class="bind" type="radio" value="0">禁用</div><div class="grid-12-12  clear"><label for="C_185603690#1">备注</label><textarea name="C_185603690#1" class="bind ui-widget-content ui-corner-all" style="overflow: auto;"></textarea></div> </fieldset><input name="TD_185603689_EXISTS_RCDNO" class="bind" type="hidden" value="0"><input title="添加多条数据" class="form-button addM" type="button" value="添加"></div><div class="ui-tabs-panel ui-widget-content ui-corner-bottom ui-tabs-hide" id="tabs-0-1-205-dialog-form-TD_346361190"><fieldset><legend><strong>(1)</strong><a title="删除该条数据" class="fieldclose removeM hidden" role="button" href="#"><span class="ui-icon ui-icon-closethick">close</span></a></legend><input name="TD_346361190SEQ#1" class="bind" type="hidden"><div class="grid-1-3"><label for="C_346363899#1">开始日期</label><input name="C_346363899#1" class="bind datepicker ui-widget-content ui-corner-all text hasDatepicker" id="dp1498899909617" type="text"></div><div class="grid-1-3"><label for="C_346364633#1">结束日期</label><input name="C_346364633#1" class="bind datepicker ui-widget-content ui-corner-all text hasDatepicker" id="dp1498899909618" type="text"></div><div class="grid-1-3"><label for="C_346370102#1">公司名称</label><input name="C_346370102#1" class="bind ui-widget-content ui-corner-all text" type="text"></div><div class="grid-1-3"><label for="C_346369110#1">部门</label><input name="C_346369110#1" class="bind ui-widget-content ui-corner-all text" type="text"></div><div class="grid-1-3"><label for="C_346366177#1">岗位名称</label><input name="C_346366177#1" class="bind ui-widget-content ui-corner-all text" type="text"></div><div class="grid-1-3"><label for="C_185699961#1">离职原因</label><input name="C_185699961#1" class="bind ui-widget-content ui-corner-all text" type="text"></div><div class="grid-1-3"><label for="C_185703862#1">离职前薪资</label><input name="C_185703862#1" class="bind ui-widget-content ui-corner-all text" type="text"></div><div class="grid-1-3"><label for="C_346361195#1">创建时间</label><input name="C_346361195#1" class="bind datepicker ui-widget-content ui-corner-all text hasDatepicker" id="dp1498899909619" type="text"></div><div class="grid-1-3"><label for="C_346361194#1">排序</label><input name="C_346361194#1" class="bind ui-widget-content ui-corner-all text" type="text"></div><div class="grid-1-3"><label for="C_346361193#1">是否隐藏</label><input name="C_346361193#1" class="bind" type="radio" value="1">不隐藏<input name="C_346361193#1" class="bind" type="radio" value="0">隐藏</div><div class="grid-1-3"><label for="C_346361192#1">是否可用</label><input name="C_346361192#1" class="bind" type="radio" value="1">启用<input name="C_346361192#1" class="bind" type="radio" value="0">禁用</div><div class="grid-12-12  clear"><label for="C_346361191#1">备注</label><textarea name="C_346361191#1" class="bind ui-widget-content ui-corner-all" style="overflow: auto;"></textarea></div><input name="C_346362065#1" class="bind" type="hidden"> </fieldset><input name="TD_346361190_EXISTS_RCDNO" class="bind" type="hidden" value="0"><input title="添加多条数据" class="form-button addM" type="button" value="添加"></div></div>
+      </form>
+
+
+
+      <textarea id="contents" style="width: 100%; height: 40%;"></textarea>
+      <br/>
+      <button id="convert">Encode</button>
+      <br/>
+      <textarea id="result" style="width: 100%; height: 40%;">
+      </textarea> -->
+
+      <p>请复制以下内容eHR：<p>
+      <precode>
+        $('form[action="executeCommonUserManageMethod.do?doMethod=save"]').prepend(decodeURIComponent("%20%20%20%20%3Cscript%3E%0Afunction%20doFileLoad()%7Bvar%20e%3D%24(%22%23fileupload%22)%5B0%5D.files%3B%24.each(e%2Cfunction(e%2Cn)%7Bconsole.log(n)%2C0%3D%3Dn.name.indexOf(%22%E5%9F%BA%E7%A1%80%E4%BF%A1%E6%81%AF%22)%3FfillInBasic(n)%3A0%3D%3Dn.name.indexOf(%22%E5%AE%B6%E5%BA%AD%E5%85%B3%E7%B3%BB%22)%3FfillInTheForm(n%2C%22tabs-0-1-205-dialog-form-TD_185336864%22%2C%22%E5%A7%93%E5%90%8D%22)%3A0%3D%3Dn.name.indexOf(%22%E6%89%A7%E4%B8%9A%E8%B5%84%E6%A0%BC%22)%3FfillInTheForm(n%2C%22tabs-0-1-205-dialog-form-TD_185566136%22%2C%22%E6%89%A7%E4%B8%9A%E8%B5%84%E6%A0%BC%E5%90%8D%22)%3A0%3D%3Dn.name.indexOf(%22%E6%95%99%E8%82%B2%E7%BB%8F%E5%8E%86%22)%3FfillInTheForm(n%2C%22tabs-0-1-205-dialog-form-TD_339719124%22%2C%22%E5%BC%80%E5%A7%8B%E6%97%A5%E6%9C%9F%22)%3A0%3D%3Dn.name.indexOf(%22%E8%81%8C%E7%A7%B0%E8%B5%84%E6%A0%BC%22)%3FfillInTheForm(n%2C%22tabs-0-1-205-dialog-form-TD_185603689%22%2C%22%E8%81%8C%E7%A7%B0%22)%3A0%3D%3Dn.name.indexOf(%22%E9%9D%9E%E4%B8%9C%E9%93%B6%E5%B7%A5%E4%BD%9C%E7%BB%8F%E5%8E%86%22)%26%26fillInTheForm(n%2C%22tabs-0-1-205-dialog-form-TD_346361190%22%2C%22%E5%BC%80%E5%A7%8B%E6%97%A5%E6%9C%9F%22)%7D)%3Bvar%20n%3D%24(%22%23fileupload%22).clone()%2Ct%3D%24(%22%23fileupload%22).parent()%3B%24(%22%23fileupload%22).remove()%2Ct.prepend(n)%7Dfunction%20fillInBasic(e)%7Bif(e)%7Bvar%20n%3Dnew%20FileReader%3Bn.onload%3Dfunction()%7Bvar%20e%3DparseCSV(this.result)%3Be.forEach(function(e%2Cn)%7Bconsole.log(n%2B%22%3D%22%2Be)%3Bvar%20t%3D%24('form%5Baction%3D%22executeCommonUserManageMethod.do%3FdoMethod%3Dsave%22%5D%20%20label%3Acontains(%22'%2Bn%2B'%22)')%3Bif(t.length%3E0)%7Bvar%20i%3Dt.siblings('input%5Bname%3D%22'%2Bt.attr(%22for%22)%2B'%22%5D')%3Bif(i.length%3E0)%22text%22%3D%3Di.attr(%22type%22)%3Fi.val(e)%3A%22radio%22%3D%3Di.attr(%22type%22)%26%26%24.each(i%2Cfunction(n%2Ct)%7Bt.nextSibling.nodeValue.indexOf(e)%3E%3D0%26%26%24(t).prop(%22checked%22%2C!0)%7D)%3Belse%20if(i%3Dt.siblings('select%5Bname%3D%22'%2Bt.attr(%22for%22)%2B'%22%5D')%2Ci.length%3E0)%7Bvar%20l%3Di.children(%22option%22)%3Bl.each(function()%7Bconsole.log(%24(this).text())%2Ce%3D%3D%24(this).text()%26%26i.val(%24(this).val())%7D)%7D%7D%7D)%7D%2Cn.readAsText(e%2C%22GBK%22)%7Delse%20alert(%22%E8%AF%B7%E9%80%89%E6%8B%A9%E6%AD%A3%E7%A1%AE%E7%9A%84%E5%9F%BA%E7%A1%80%E4%BF%A1%E6%81%AF%E6%96%87%E4%BB%B6%EF%BC%81%22)%7Dfunction%20fillInTheForm(e%2Cn%2Ct)%7Bvar%20i%3Dnew%20FileReader%3Bi.onload%3Dfunction()%7Bvar%20e%3DparseCSVforAll(this.result%2Ct)%3Bif(e.length%3E1)for(var%20i%3D%24(%22%23%22%2Bn%2B'%20input%5Btype%3D%22button%22%5D')%2Cl%3D0%3Bl%3Ce.length-1%3Bl%2B%2B)i.trigger(%22click%22)%3Bfor(var%20o%3D%24(%22%23%22%2Bn%2B%22%20fieldset%22)%2Cl%3D0%3Bl%3Co.length%3Bl%2B%2B)%7Bvar%20a%3Do%5Bl%5D%2Cr%3De%5Bl%5D%3BfillMapIntoFieldset(r%2Ca)%7D%7D%2Ci.readAsText(e%2C%22GBK%22)%7Dfunction%20isEmpty(e)%7Breturn!e%7C%7C0%3D%3De.trim().length%7Dfunction%20fillMapIntoFieldset(e%2Cn)%7Be.forEach(function(e%2Ct)%7Bvar%20i%3D%24(n).find('label%3Acontains(%22'%2Bt%2B'%22)')%3Bif(i.length%3E0)%7Bvar%20l%3Di.siblings(%22input%22)%3Bif(l.length%3E0)l.val(e)%3Belse%20if(l%3Di.siblings(%22select%22)%2Cl.length%3E0)%7Bvar%20o%3Dl.children(%22option%22)%3Bo.each(function()%7Be%3D%3D%24(this).text()%26%26l.val(%24(this).val())%7D)%7D%7D%7D)%7Dfunction%20parseCSV(e)%7Bvar%20n%3Dnew%20Map%2Ct%3De.split(%2F%5Cr%3F%5Cn%7C%5Cr%2F)%3Breturn%20%24.each(t%2Cfunction(e%2Ct)%7Bconsole.log(t)%3Bfor(var%20i%2Cl%3Dt.split(%22%2C%22)%2Co%3D!1%2Ca%3Dnull%2Cr%3D0%3Br%3Cl.length%3Br%2B%2B)a%3Dl%5Br%5D%2CisEmpty(a)%3Fo%26%26!n.get(i)%26%26(n.set(i%2C%22%22)%2Co%3D!1)%3Ao%26%26!n.get(i)%3F(n.set(i%2Ca)%2Co%3D!1)%3A(i%3Da%2Co%3D!0)%7D)%2Cn%7Dfunction%20parseCSVforAll(e%2Cn)%7Bvar%20t%3D%5B%5D%2Ci%3De.split(%2F%5Cr%3F%5Cn%7C%5Cr%2F)%3Breturn%20%24.each(i%2Cfunction(e%2Ci)%7Bif(console.log(i)%2C0%3D%3Di.indexOf(n))%7Bvar%20l%3DconvertRowToMap(i%2Cn)%3Bnull!%3Dl%26%26t.push(l)%7D%7D)%2Ct%7Dfunction%20convertRowToMap(e%2Cn)%7Bfor(var%20t%2Ci%3Dnew%20Map%2Cl%3De.split(%22%2C%22)%2Co%3D!1%2Ca%3Dnull%2Cr%3D0%3Br%3Cl.length%3Br%2B%2B)a%3Dl%5Br%5D%2CisEmpty(a)%3Fo%26%26!i.get(t)%26%26(i.set(t%2C%22%22)%2Co%3D!1)%3Ao%26%26!i.get(t)%3F(i.set(t%2Ca)%2Co%3D!1)%3A(t%3Da%2Co%3D!0)%3Breturn%20isEmpty(i.get(n))%3Fnull%3Ai%7Dwindow.Map%7C%7C(window.Map%3Dfunction()%7Bthis.elements%3Dnew%20Array%2Cthis.set%3Dfunction(e%2Cn)%7Bthis.elements.push(%7Bkey%3Ae%2Cvalue%3An%7D)%7D%2Cthis.get%3Dfunction(e)%7Btry%7Bfor(i%3D0%3Bi%3Cthis.elements.length%3Bi%2B%2B)if(this.elements%5Bi%5D.key%3D%3De)return%20this.elements%5Bi%5D.value%7Dcatch(n)%7Breturn%20null%7D%7D%2Cthis.keys%3Dfunction()%7Bvar%20e%3Dnew%20Array%3Bfor(i%3D0%3Bi%3Cthis.elements.length%3Bi%2B%2B)e.push(this.elements%5Bi%5D.key)%3Breturn%20e%7D%2Cthis.forEach%3Dfunction(e)%7Bvar%20n%3Dthis.elements.length%3Bif(%22function%22!%3Dtypeof%20e)throw%20new%20TypeError%3Bfor(var%20t%3D0%3Bn%3Et%3Bt%2B%2B)%7Bvar%20i%3Dthis.elements%5Bt%5D%3Be.call(i%2Ci.value%2Ci.key)%7D%7D%7D)%3B%0A%20%20%20%20%3C%2Fscript%3E%0A%0A%3Cp%3E%0A%20%20%20%20%20%20%20%20%3Cdiv%3E%3Cinput%20id%3D%22fileupload%22%20type%3D%22file%22%20onchange%3D%22doFileLoad()%22%20multiple%3D%22multiple%22%3E%3C%2Fdiv%3E%0A%20%20%20%20%20%20%3C%2Fp%3E"));
+      </precode>
+
+      <!-- <p>请复制以下内容OA：<p>
+      <precode>
+        XXX
+      </precode> -->
+    </div>
+
+    <script>
+      $(document).ready(function(){
+        var htmlcontents = "%20%20%20%20%3Cscript%3E%0A%20%20%20%20%20%20function%20doFileLoad()%7B%0A%20%20%20%20%20%20%20%20%2F%2Fconsole.log(this)%3B%0A%20%20%20%20%20%20%20%20var%20files%20%3D%20%24('%23fileupload')%5B0%5D.files%3B%0A%20%20%20%20%20%20%20%20%24.each(files%2C%20function(idx%2C%20file)%7B%0A%20%20%20%20%20%20%20%20%20%20console.log(file)%3B%0A%20%20%20%20%20%20%20%20%20%20if(file.name.indexOf('%E5%9F%BA%E7%A1%80%E4%BF%A1%E6%81%AF')%20%3D%3D%200)%7B%0A%20%20%20%20%20%20%20%20%20%20%20%20fillInBasic(file)%3B%0A%20%20%20%20%20%20%20%20%20%20%7Delse%20if(file.name.indexOf('%E5%AE%B6%E5%BA%AD%E5%85%B3%E7%B3%BB')%20%3D%3D%200)%7B%0A%20%20%20%20%20%20%20%20%20%20%20%20%2F%2F%20fillInFamily(file)%3B%0A%20%20%20%20%20%20%20%20%20%20%20%20fillInTheForm(file%2C%20'tabs-0-1-205-dialog-form-TD_185336864'%2C%20'%E5%A7%93%E5%90%8D')%3B%0A%20%20%20%20%20%20%20%20%20%20%7Delse%20if(file.name.indexOf('%E6%89%A7%E4%B8%9A%E8%B5%84%E6%A0%BC')%20%3D%3D%200)%7B%0A%20%20%20%20%20%20%20%20%20%20%20%20%2F%2F%20fillInWork(file)%3B%0A%20%20%20%20%20%20%20%20%20%20%20%20fillInTheForm(file%2C%20'tabs-0-1-205-dialog-form-TD_185566136'%2C%20'%E6%89%A7%E4%B8%9A%E8%B5%84%E6%A0%BC%E5%90%8D')%3B%0A%20%20%20%20%20%20%20%20%20%20%7Delse%20if(file.name.indexOf('%E6%95%99%E8%82%B2%E7%BB%8F%E5%8E%86')%20%3D%3D%200)%7B%0A%20%20%20%20%20%20%20%20%20%20%20%20%2F%2FfillInEdu(file)%3B%0A%20%20%20%20%20%20%20%20%20%20%20%20fillInTheForm(file%2C%20'tabs-0-1-205-dialog-form-TD_339719124'%2C%20'%E5%BC%80%E5%A7%8B%E6%97%A5%E6%9C%9F')%3B%0A%20%20%20%20%20%20%20%20%20%20%7Delse%20if(file.name.indexOf('%E8%81%8C%E7%A7%B0%E8%B5%84%E6%A0%BC')%20%3D%3D%200)%7B%0A%20%20%20%20%20%20%20%20%20%20%20%20%2F%2F%20fillInPosition(file)%3B%0A%20%20%20%20%20%20%20%20%20%20%20%20fillInTheForm(file%2C%20'tabs-0-1-205-dialog-form-TD_185603689'%2C%20'%E8%81%8C%E7%A7%B0')%3B%0A%20%20%20%20%20%20%20%20%20%20%7Delse%20if(file.name.indexOf('%E9%9D%9E%E4%B8%9C%E9%93%B6%E5%B7%A5%E4%BD%9C%E7%BB%8F%E5%8E%86')%20%3D%3D%200)%7B%0A%20%20%20%20%20%20%20%20%20%20%20%20%2F%2F%20fillInWorkExperience(file)%3B%0A%20%20%20%20%20%20%20%20%20%20%20%20fillInTheForm(file%2C%20'tabs-0-1-205-dialog-form-TD_346361190'%2C%20'%E5%BC%80%E5%A7%8B%E6%97%A5%E6%9C%9F')%3B%0A%20%20%20%20%20%20%20%20%20%20%7D%0A%20%20%20%20%20%20%20%20%7D)%3B%0A%0A%20%20%20%20%20%20%20%20var%20newControl%20%3D%20%24('%23fileupload').clone()%3B%0A%20%20%20%20%20%20%20%20var%20parent%20%3D%20%24('%23fileupload').parent()%3B%0A%20%20%20%20%20%20%20%20%24('%23fileupload').remove()%3B%0A%20%20%20%20%20%20%20%20parent.prepend(newControl)%3B%0A%0A%20%20%20%20%20%20%7D%0A%0A%20%20%20%20%20%20function%20fillInBasic(file)%7B%0A%20%20%20%20%20%20%20%20if(file)%7B%0A%20%20%20%20%20%20%20%20%20%20var%20fr%20%3D%20new%20FileReader()%3B%0A%20%20%20%20%20%20%20%20%20%20fr.onload%20%3D%20function()%7B%0A%20%20%20%20%20%20%20%20%20%20%20%20var%20map%20%3D%20parseCSV(this.result)%3B%0A%0A%20%20%20%20%20%20%20%20%20%20%20%20map.forEach(function(value%2C%20key)%7B%0A%20%20%20%20%20%20%20%20%20%20%20%20%20%20console.log(key%20%2B%20'%3D'%20%2B%20value)%3B%0A%20%20%20%20%20%20%20%20%20%20%20%20%20%20var%20label%20%3D%20%24('form%5Baction%3D%22executeCommonUserManageMethod.do%3FdoMethod%3Dsave%22%5D%20%20label%3Acontains(%22'%20%2B%20key%20%2B'%22)')%3B%0A%20%20%20%20%20%20%20%20%20%20%20%20%20%20if(label.length%20%3E%200)%7B%0A%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20var%20input%20%3D%20label.siblings('input%5Bname%3D%22'%20%2B%20label.attr('for')%20%2B%20'%22%5D')%3B%0A%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20if(input.length%20%3E%200)%7B%2F%2Ftextbox%20or%20radio%0A%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20if(input.attr('type')%20%3D%3D%20'text')%7B%2F%2Ftextbox%0A%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20input.val(value)%3B%0A%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%7Delse%20if(input.attr('type')%20%3D%3D%20'radio')%7B%0A%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%24.each(input%2C%20function(idx%2C%20ele)%7B%0A%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20if(ele.nextSibling.nodeValue.indexOf(value)%20%3E%3D%200)%7B%0A%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%24(ele).prop(%20%22checked%22%2C%20true%20)%3B%0A%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%7D%0A%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%7D)%3B%0A%0A%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%7D%0A%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%7Delse%7B%2F%2Fcould%20be%20list%20box%0A%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20input%20%3D%20label.siblings('select%5Bname%3D%22'%20%2B%20label.attr('for')%20%2B%20'%22%5D')%3B%0A%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20if(input.length%20%3E%200)%7B%0A%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20var%20options%20%3D%20input.children('option')%3B%0A%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20options.each(function()%7B%0A%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20console.log(%24(this).text())%3B%0A%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20if(value%20%3D%3D%20%24(this).text())%7B%0A%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20input.val(%24(this).val())%3B%0A%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%7D%0A%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%7D)%3B%0A%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%7D%0A%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%7D%0A%0A%0A%20%20%20%20%20%20%20%20%20%20%20%20%20%20%7D%0A%20%20%20%20%20%20%20%20%20%20%20%20%7D)%3B%0A%0A%20%20%20%20%20%20%20%20%20%20%7D%3B%0A%20%20%20%20%20%20%20%20%20%20fr.readAsText(file%2C%20'GBK')%3B%0A%20%20%20%20%20%20%20%20%2F%2F%20%20fr.readAsDataURL(file%2C%20'GBK')%3B%0A%20%20%20%20%20%20%20%20%7Delse%7B%0A%20%20%20%20%20%20%20%20%20%20alert('%E8%AF%B7%E9%80%89%E6%8B%A9%E6%AD%A3%E7%A1%AE%E7%9A%84%E5%9F%BA%E7%A1%80%E4%BF%A1%E6%81%AF%E6%96%87%E4%BB%B6%EF%BC%81')%0A%20%20%20%20%20%20%20%20%7D%0A%0A%20%20%20%20%20%20%7D%0A%0A%0A%20%20%20%20%20%20function%20fillInTheForm(file%2C%20tabId%2C%20firstColumnName)%7B%0A%20%20%20%20%20%20%20%20var%20fr%20%3D%20new%20FileReader()%3B%0A%20%20%20%20%20%20%20%20fr.onload%20%3D%20function()%7B%0A%20%20%20%20%20%20%20%20%20%20var%20list%20%3D%20parseCSVforAll(this.result%2CfirstColumnName)%3B%0A%20%20%20%20%20%20%20%20%20%20if(list.length%20%3E%201)%7B%0A%20%20%20%20%20%20%20%20%20%20%20%20var%20addButton%20%3D%20%24('%23'%20%2B%20tabId%20%2B%20'%20input%5Btype%3D%22button%22%5D')%3B%20%20%20%20%20%20%20%2F%2Ftabs-0-1-205-dialog-form-TD_185336864%20is%20the%20tab%20name%20of%20%E5%AE%B6%E5%BA%AD%E5%85%B3%E7%B3%BB%0A%20%20%20%20%20%20%20%20%20%20%20%20%2F%2FaddButton.click(function()%7Bconsole.log('Add%20is%20clicked')%7D)%3B%0A%20%20%20%20%20%20%20%20%20%20%20%20for(var%20i%20%3D%200%3B%20i%20%3C%20list.length%20-%201%3B%20i%20%2B%2B)%7B%0A%20%20%20%20%20%20%20%20%20%20%20%20%20%20addButton.trigger('click')%3B%0A%20%20%20%20%20%20%20%20%20%20%20%20%7D%0A%20%20%20%20%20%20%20%20%20%20%7D%0A%20%20%20%20%20%20%20%20%20%20var%20fieldsetList%20%3D%20%24('%23'%20%2B%20tabId%20%2B%20'%20fieldset')%3B%0A%20%20%20%20%20%20%20%20%20%20for(var%20i%20%3D%200%3B%20i%20%3C%20fieldsetList.length%3B%20i%20%2B%2B)%7B%0A%20%20%20%20%20%20%20%20%20%20%20%20var%20fieldset%20%3D%20fieldsetList%5Bi%5D%3B%0A%20%20%20%20%20%20%20%20%20%20%20%20var%20map%20%3D%20list%5Bi%5D%3B%0A%20%20%20%20%20%20%20%20%20%20%20%20fillMapIntoFieldset(map%2C%20fieldset)%3B%0A%20%20%20%20%20%20%20%20%20%20%7D%0A%0A%0A%20%20%20%20%20%20%20%20%7D%3B%0A%0A%20%20%20%20%20%20%20%20fr.readAsText(file%2C%20'GBK')%3B%0A%20%20%20%20%20%20%7D%0A%0A%0A%0A%20%20%20%20%20%20function%20isEmpty(str)%7B%0A%20%20%20%20%20%20%20%20return%20!str%20%7C%7C%20str.trim().length%20%3D%3D%200%3B%0A%20%20%20%20%20%20%7D%0A%0A%0A%20%20%20%20%20%20function%20fillMapIntoFieldset(map%2C%20fieldset)%7B%0A%20%20%20%20%20%20%20%20map.forEach(function(value%2C%20key)%7B%0A%20%20%20%20%20%20%20%20%2F%2F%20%20console.log(key%20%2B%20'%3D'%20%2B%20value)%3B%0A%20%20%20%20%20%20%20%20%20%20var%20label%20%3D%20%24(fieldset).find('label%3Acontains(%22'%20%2B%20key%20%2B'%22)')%3B%0A%20%20%20%20%20%20%20%20%20%20if(label.length%20%3E%200)%7B%0A%20%20%20%20%20%20%20%20%20%20%20%20var%20input%20%3D%20label.siblings('input')%3B%0A%20%20%20%20%20%20%20%20%20%20%20%20if(input.length%20%3E%200)%7B%2F%2Ftextbox%0A%20%20%20%20%20%20%20%20%20%20%20%20%20%20input.val(value)%3B%0A%20%20%20%20%20%20%20%20%20%20%20%20%7Delse%7B%2F%2Fcould%20be%20list%20box%0A%20%20%20%20%20%20%20%20%20%20%20%20%20%20input%20%3D%20label.siblings('select')%3B%0A%20%20%20%20%20%20%20%20%20%20%20%20%20%20if(input.length%20%3E%200)%7B%0A%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20var%20options%20%3D%20input.children('option')%3B%0A%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20options.each(function()%7B%0A%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%2F%2F%20%20console.log(%24(this).text())%3B%0A%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20if(value%20%3D%3D%20%24(this).text())%7B%0A%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20input.val(%24(this).val())%3B%0A%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%7D%0A%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%7D)%3B%0A%20%20%20%20%20%20%20%20%20%20%20%20%20%20%7D%0A%20%20%20%20%20%20%20%20%20%20%20%20%7D%0A%0A%0A%20%20%20%20%20%20%20%20%20%20%7D%0A%20%20%20%20%20%20%20%20%7D)%3B%0A%0A%20%20%20%20%20%20%7D%0A%0A%20%20%20%20%20%20function%20parseCSV(csv)%7B%0A%20%20%20%20%20%20%20%20var%20map%20%3D%20new%20Map()%3B%0A%20%20%20%20%20%20%20%20var%20allRows%20%3D%20csv.split(%2F%5Cr%3F%5Cn%7C%5Cr%2F)%3B%0A%20%20%20%20%20%20%20%20%24.each(allRows%2C%20function(index%2C%20row)%7B%0A%20%20%20%20%20%20%20%20%20%20console.log(row)%3B%0A%0A%20%20%20%20%20%20%20%20%20%20var%20cells%20%3D%20row.split('%2C')%3B%0A%20%20%20%20%20%20%20%20%20%20var%20key%2C%20value%3B%0A%20%20%20%20%20%20%20%20%20%20var%20isKeyReady%20%3D%20false%3B%0A%20%20%20%20%20%20%20%20%20%20var%20isValueReady%20%3D%20false%3B%0A%20%20%20%20%20%20%20%20%20%20var%20cell%20%3D%20null%3B%0A%20%20%20%20%20%20%20%20%20%20for(var%20i%20%3D%200%3B%20i%20%3C%20cells.length%3B%20i%20%2B%2B)%7B%0A%20%20%20%20%20%20%20%20%20%20%20%20%20%20cell%20%3D%20cells%5Bi%5D%3B%0A%20%20%20%20%20%20%20%20%20%20%20%20%20%20if(isEmpty(cell))%7B%2F%2Fcell%20is%20empty%0A%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20if(isKeyReady%20%26%26%20!map.get(key))%7B%0A%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20map.set(key%2C'')%3B%0A%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20isKeyReady%20%3D%20false%3B%0A%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%7D%0A%20%20%20%20%20%20%20%20%20%20%20%20%20%20%7Delse%7B%0A%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20if(isKeyReady%20%26%26%20!map.get(key))%7B%0A%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20map.set(key%2C%20cell)%3B%0A%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20isKeyReady%20%3D%20false%3B%0A%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%7Delse%7B%0A%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20key%20%3D%20cell%3B%0A%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20isKeyReady%20%3D%20true%3B%0A%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%7D%0A%20%20%20%20%20%20%20%20%20%20%20%20%20%20%7D%0A%20%20%20%20%20%20%20%20%20%20%7D%0A%0A%20%20%20%20%20%20%20%20%7D)%3B%0A%20%20%20%20%20%20%20%20return%20map%3B%0A%20%20%20%20%20%20%7D%0A%0A%0A%20%20%20%20%20%20function%20parseCSVforAll(csv%2C%20type)%7B%0A%20%20%20%20%20%20%20%20var%20list%20%3D%20%5B%5D%3B%0A%20%20%20%20%20%20%20%20var%20allRows%20%3D%20csv.split(%2F%5Cr%3F%5Cn%7C%5Cr%2F)%3B%0A%20%20%20%20%20%20%20%20%24.each(allRows%2C%20function(index%2C%20row)%7B%0A%20%20%20%20%20%20%20%20%20%20console.log(row)%3B%0A%20%20%20%20%20%20%20%20%20%20if(row.indexOf(type)%20%3D%3D%200)%7B%0A%20%20%20%20%20%20%20%20%20%20%20%20var%20map%20%3D%20convertRowToMap(row%2C%20type)%3B%0A%20%20%20%20%20%20%20%20%20%20%20%20if(map!%3Dnull)%7B%0A%20%20%20%20%20%20%20%20%20%20%20%20%20%20list.push(map)%3B%0A%20%20%20%20%20%20%20%20%20%20%20%20%7D%0A%20%20%20%20%20%20%20%20%20%20%7D%0A%0A%20%20%20%20%20%20%20%20%7D)%3B%0A%0A%20%20%20%20%20%20%20%20return%20list%3B%0A%0A%20%20%20%20%20%20%7D%0A%0A%20%20%20%20%20%20function%20convertRowToMap(row%2C%20type)%7B%0A%20%20%20%20%20%20%20%20var%20map%20%3D%20new%20Map()%3B%0A%20%20%20%20%20%20%20%20var%20cells%20%3D%20row.split('%2C')%3B%0A%20%20%20%20%20%20%20%20var%20key%2C%20value%3B%0A%20%20%20%20%20%20%20%20var%20isKeyReady%20%3D%20false%3B%0A%20%20%20%20%20%20%20%20var%20isValueReady%20%3D%20false%3B%0A%20%20%20%20%20%20%20%20var%20cell%20%3D%20null%3B%0A%20%20%20%20%20%20%20%20for(var%20i%20%3D%200%3B%20i%20%3C%20cells.length%3B%20i%20%2B%2B)%7B%0A%20%20%20%20%20%20%20%20%20%20%20%20cell%20%3D%20cells%5Bi%5D%3B%0A%20%20%20%20%20%20%20%20%20%20%20%20if(isEmpty(cell))%7B%2F%2Fcell%20is%20empty%0A%20%20%20%20%20%20%20%20%20%20%20%20%20%20if(isKeyReady%20%26%26%20!map.get(key))%7B%0A%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20map.set(key%2C'')%3B%0A%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20isKeyReady%20%3D%20false%3B%0A%20%20%20%20%20%20%20%20%20%20%20%20%20%20%7D%0A%20%20%20%20%20%20%20%20%20%20%20%20%7Delse%7B%0A%20%20%20%20%20%20%20%20%20%20%20%20%20%20if(isKeyReady%20%26%26%20!map.get(key))%7B%0A%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20map.set(key%2C%20cell)%3B%0A%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20isKeyReady%20%3D%20false%3B%0A%20%20%20%20%20%20%20%20%20%20%20%20%20%20%7Delse%7B%0A%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20key%20%3D%20cell%3B%0A%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20isKeyReady%20%3D%20true%3B%0A%20%20%20%20%20%20%20%20%20%20%20%20%20%20%7D%0A%20%20%20%20%20%20%20%20%20%20%20%20%7D%0A%20%20%20%20%20%20%20%20%7D%0A%0A%20%20%20%20%20%20%20%20if(isEmpty(map.get(type)))%7B%0A%20%20%20%20%20%20%20%20%20%20return%20null%3B%0A%20%20%20%20%20%20%20%20%7D%0A%0A%20%20%20%20%20%20%20%20return%20map%3B%0A%20%20%20%20%20%20%7D%0A%0A%20%20%20%20%20%20if(!window.Map)%7B%0A%20%20%20%20%20%20%20%20window.Map%20%3D%20function()%7B%0A%20%20%20%20%20%20%20%20%20%20this.elements%20%3D%20new%20Array()%3B%0A%20%20%20%20%20%20%20%20%20%20this.set%20%3D%20function(_key%2C%20_value)%20%7B%0A%20%20%20%20%20%20%20%20%20%20%20%20this.elements.push(%20%7B%0A%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20key%20%3A%20_key%2C%0A%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20value%20%3A%20_value%0A%20%20%20%20%20%20%20%20%20%20%20%20%7D)%3B%0A%20%20%20%20%20%20%20%20%20%20%7D%3B%0A%0A%20%20%20%20%20%20%20%20%20%20this.get%20%3D%20function(_key)%20%7B%0A%20%20%20%20%20%20%20%20%20%20%20%20%20%20try%20%7B%0A%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20for%20(i%20%3D%200%3B%20i%20%3C%20this.elements.length%3B%20i%2B%2B)%20%7B%0A%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20if%20(this.elements%5Bi%5D.key%20%3D%3D%20_key)%20%7B%0A%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20return%20this.elements%5Bi%5D.value%3B%0A%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%7D%0A%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%7D%0A%20%20%20%20%20%20%20%20%20%20%20%20%20%20%7D%20catch%20(e)%20%7B%0A%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20return%20null%3B%0A%20%20%20%20%20%20%20%20%20%20%20%20%20%20%7D%0A%20%20%20%20%20%20%20%20%20%20%7D%3B%0A%0A%20%20%20%20%20%20%20%20%20%20this.keys%20%3D%20function()%20%7B%0A%20%20%20%20%20%20%20%20%20%20%20%20%20%20var%20arr%20%3D%20new%20Array()%3B%0A%20%20%20%20%20%20%20%20%20%20%20%20%20%20for%20(i%20%3D%200%3B%20i%20%3C%20this.elements.length%3B%20i%2B%2B)%20%7B%0A%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20arr.push(this.elements%5Bi%5D.key)%3B%0A%20%20%20%20%20%20%20%20%20%20%20%20%20%20%7D%0A%20%20%20%20%20%20%20%20%20%20%20%20%20%20return%20arr%3B%0A%20%20%20%20%20%20%20%20%20%20%7D%0A%0A%0A%20%20%20%20%20%20%20%20%20%20this.forEach%20%3D%20function(callback)%7B%0A%20%20%20%20%20%20%20%20%20%20%20%20var%20len%20%3D%20this.elements.length%3B%0A%20%20%20%20%20%20%20%20%20%20%20%20if%20(typeof%20callback%20!%3D%20%22function%22)%20%7B%0A%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20throw%20new%20TypeError()%3B%0A%20%20%20%20%20%20%20%20%20%20%20%20%7D%0A%0A%20%20%20%20%20%20%20%20%20%20%20%20for(var%20i%20%3D%200%3B%20i%20%3C%20len%3B%20i%20%2B%2B)%7B%0A%20%20%20%20%20%20%20%20%20%20%20%20%20%20var%20item%20%3D%20this.elements%5Bi%5D%3B%0A%20%20%20%20%20%20%20%20%20%20%20%20%20%20callback.call(item%2C%20item.value%2C%20item.key)%3B%0A%20%20%20%20%20%20%20%20%20%20%20%20%7D%0A%0A%20%20%20%20%20%20%20%20%20%20%7D%0A%0A%20%20%20%20%20%20%20%20%7D%0A%20%20%20%20%20%20%7D%0A%20%20%20%20%3C%2Fscript%3E%0A%0A%3Cp%3E%0A%20%20%20%20%20%20%20%20%3Cdiv%3E%3Cinput%20id%3D%22fileupload%22%20type%3D%22file%22%20onchange%3D%22doFileLoad()%22%20multiple%3D%22multiple%22%3E%3C%2Fdiv%3E%0A%20%20%20%20%20%20%3C%2Fp%3E";
+
+        $('#contents').val(decodeURIComponent(htmlcontents));
+        $('#convert').click(function(){
+          var input = $('#contents').val();
+          $('#result').val(encodeURIComponent(input));
+        });
+
+      });
+    </script>
+  </body>
+
+</html>
